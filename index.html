@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>通勤ルート</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoi6YCa5YukIOODq+ODvOODiOaknOe0oiIsInNob3J0X25hbWUiOiLpgJrli6Tmo5zntKIiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI2Y4ZjlmYiIsInRoZW1lX2NvbG9yIjoiIzQxNzNmNiJ9">
+<meta name="theme-color" content="#4173f6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #f0f4ff;
+  --surface: #ffffff;
+  --surface2: #f8f9fb;
+  --accent: #4173f6;
+  --accent2: #7c5cfc;
+  --accent-light: #e8eeff;
+  --text: #1a1d2e;
+  --text2: #6b7280;
+  --text3: #9ca3af;
+  --red: #ef4444;
+  --orange: #f97316;
+  --green: #22c55e;
+  --border: #e5e9f2;
+  --shadow: 0 1px 3px rgba(65,115,246,0.08), 0 4px 16px rgba(65,115,246,0.06);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --radius: 14px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+/* ========== Header ========== */
+.header {
+  position: sticky; top:0; z-index:100;
+  background: rgba(240,244,255,0.92);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.header-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.header h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+.header .now {
+  font-size: 12px; color: var(--text2);
+  background: var(--surface); border-radius: 20px;
+  padding: 4px 10px; border: 1px solid var(--border);
+}
+
+/* ルートバリアント表示 */
+.route-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  padding: 3px 9px; border-radius: 20px;
+  margin-left: 8px;
+}
+.route-badge.early {
+  background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2;
+}
+.route-badge.late {
+  background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb;
+}
+
+/* 方向切換 */
+.dir-toggle {
+  display:flex; gap:6px; margin-bottom:10px;
+}
+.dir-btn {
+  flex:1; padding:9px 8px; text-align:center; font-size:14px; font-weight:600;
+  background: var(--surface); color: var(--text2);
+  border: 1px solid var(--border); border-radius: 10px;
+  cursor:pointer; transition: all 0.18s;
+}
+.dir-btn.active {
+  background: var(--accent); color:#fff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(65,115,246,0.3);
+}
+
+/* 検索ボタン */
+.search-btn {
+  width:100%; padding:11px; border:none; border-radius:10px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  color:#fff; font-size:15px; font-weight:700; cursor:pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  box-shadow: 0 2px 10px rgba(65,115,246,0.35);
+  letter-spacing: 0.2px;
+}
+.search-btn:active { transform: scale(0.97); box-shadow: 0 1px 4px rgba(65,115,246,0.2); }
+
+/* ========== Results ========== */
+.results { padding: 14px 16px; }
+.results .hint {
+  text-align:center; color:var(--text3); padding:50px 0; font-size:14px;
+  line-height: 1.8;
+}
+
+/* ルート切換タブ（行き：10:30前後） */
+.route-tabs {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.route-tab {
+  flex: 1; padding: 9px 6px; text-align: center;
+  font-size: 13px; font-weight: 600;
+  border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text2);
+  cursor: pointer; transition: all 0.18s;
+}
+.route-tab.active {
+  border-color: var(--accent); background: var(--accent-light);
+  color: var(--accent);
+}
+
+/* Plan Card */
+.plan-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: border-color 0.2s;
+}
+.plan-card.best { border-color: var(--accent); }
+.plan-top {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom: 12px; padding-bottom:10px; border-bottom:1px solid var(--border);
+}
+.plan-times { font-size: 22px; font-weight:700; letter-spacing:-0.5px; color: var(--text); }
+.plan-times span { color: var(--text3); font-size:13px; font-weight:400; margin: 0 6px; }
+.plan-meta { text-align:right; }
+.plan-meta .total { font-size:12px; color:var(--accent2); font-weight:700; }
+.plan-meta .countdown {
+  font-size: 12px; color: var(--text2); margin-top: 3px;
+  background: var(--surface2); padding: 2px 8px; border-radius: 10px;
+}
+.best-badge {
+  font-size:10px; font-weight:700; color: var(--accent);
+  background: var(--accent-light); padding: 2px 7px; border-radius: 6px;
+  margin-bottom: 4px; display: inline-block;
+}
+
+/* Leg */
+.leg {
+  display:flex; gap:10px; margin-bottom:8px; position:relative;
+  padding-left: 20px;
+}
+.leg::before {
+  content:''; position:absolute; left:7px; top:10px; bottom:-8px;
+  width:1.5px; background: var(--border);
+}
+.leg:last-of-type::before { display:none; }
+.leg-dot {
+  position:absolute; left:3px; top:7px;
+  width:10px; height:10px; border-radius:50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+.leg-info { flex:1; }
+.leg-line {
+  font-size:11px; color:var(--accent2); font-weight:700;
+  margin-bottom:2px; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.leg-stations { font-size:14px; margin-bottom:3px; color: var(--text); }
+.leg-stations .time { font-weight:700; }
+.leg-platform { font-size:11px; color: var(--text2); margin-bottom:2px; }
+
+/* 乗換タグ */
+.transfer-tag {
+  display:inline-flex; align-items: center; gap: 3px;
+  font-size:11px; font-weight:600;
+  padding: 3px 9px; border-radius:6px; margin: 4px 0 6px 0;
+}
+.transfer-tag.tight { background:#fef2f2; color:var(--red); border: 1px solid #fecaca; }
+.transfer-tag.moderate { background:#fff7ed; color:var(--orange); border: 1px solid #fed7aa; }
+.transfer-tag.relaxed { background:#f0fdf4; color:var(--green); border: 1px solid #bbf7d0; }
+
+/* ========== 時刻別備考 ========== */
+.notes-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+.note-tag {
+  font-size:11px; padding:3px 8px; border-radius:6px;
+  background: var(--accent-light); color: var(--accent);
+  font-weight: 500;
+}
+.note-edit-btn {
+  font-size:11px; padding:3px 8px; border-radius:6px;
+  background: var(--surface2); color:var(--text2);
+  border:1px dashed var(--border); cursor:pointer;
+  transition: background 0.15s;
+}
+.note-edit-btn:active { background: var(--accent-light); }
+
+/* 備考が時刻固有であることを示すバッジ */
+.note-time-badge {
+  font-size:10px; padding:2px 6px; border-radius:5px;
+  background: #fef9c3; color: #a16207;
+  border: 1px solid #fde68a;
+  font-weight: 600;
+}
+
+/* ========== Modal ========== */
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(10,10,30,0.35); backdrop-filter:blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  align-items:flex-end; justify-content:center;
+}
+.modal-overlay.show { display:flex; }
+.modal {
+  background: var(--surface); border-radius: 20px 20px 0 0;
+  width:100%; max-width:520px; max-height:88vh; overflow-y:auto;
+  padding: 20px 16px; padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 30px rgba(0,0,0,0.12);
+}
+.modal-handle {
+  width: 36px; height: 4px; background: var(--border);
+  border-radius: 2px; margin: 0 auto 16px;
+}
+.modal h2 { font-size:17px; font-weight:700; margin-bottom:14px; }
+.modal label { display:block; font-size:13px; color:var(--text2); margin:12px 0 4px; font-weight:500; }
+.modal input, .modal textarea, .modal select {
+  width:100%; padding:11px 12px; border-radius:10px;
+  border:1.5px solid var(--border);
+  background: var(--surface2); color:var(--text); font-size:14px;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+}
+.modal input:focus, .modal textarea:focus {
+  outline: none; border-color: var(--accent);
+  background: var(--surface);
+}
+.modal textarea { min-height:70px; resize:vertical; }
+.modal-actions { display:flex; gap:8px; margin-top:18px; }
+.modal-actions button {
+  flex:1; padding:12px; border:none; border-radius:10px;
+  font-size:15px; font-weight:600; cursor:pointer;
+  transition: opacity 0.15s;
+}
+.modal-actions button:active { opacity: 0.75; }
+.btn-primary { background: var(--accent); color:#fff; }
+.btn-secondary { background: var(--surface2); color:var(--text2); border: 1px solid var(--border); }
+
+/* Bottom Bar */
+.bottom-bar {
+  position:fixed; bottom:0; left:0; right:0;
+  background: rgba(240,244,255,0.94);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-top:1px solid var(--border);
+  display:flex; padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  gap:8px;
+}
+.bottom-bar button {
+  flex:1; padding:9px 4px; border:none; border-radius:10px;
+  background: var(--surface); color:var(--text2); font-size:11px; font-weight:600;
+  cursor:pointer; border: 1px solid var(--border);
+  transition: all 0.15s;
+}
+.bottom-bar button:active { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+
+/* 時刻表編集 */
+.tt-section { margin-bottom:18px; }
+.tt-section h3 { font-size:13px; color:var(--accent2); margin-bottom:6px; font-weight:700; }
+.tt-chips { display:flex; flex-wrap:wrap; gap:5px; }
+.tt-chip {
+  font-size:12px; padding:4px 10px; border-radius:7px;
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+}
+.tt-chip .del { color:var(--red); margin-left:4px; cursor:pointer; }
+.add-time-row { display:flex; gap:6px; margin-top:6px; }
+.add-time-row input { flex:1; }
+.add-time-row button {
+  padding:9px 14px; border:none; border-radius:9px;
+  background:var(--accent); color:#fff; font-size:13px; cursor:pointer; font-weight:600;
+}
+
+/* 備注管理 */
+.note-list-item {
+  padding:12px; background:var(--surface2); border-radius:10px;
+  margin-bottom:8px; font-size:13px; border: 1px solid var(--border);
+}
+.note-list-item .key { color:var(--accent); font-weight:700; margin-bottom:4px; font-size:12px; }
+.note-list-item .vals { color:var(--text2); line-height: 1.6; }
+.note-list-item .del-note {
+  color:var(--red); font-size:12px; cursor:pointer; float:right;
+  font-weight:600;
+}
+
+/* ルート分岐説明 */
+.route-info-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.6;
+}
+.route-info-box strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- ========== Header ========== -->
+<div class="header">
+  <div class="header-top">
+    <h1 id="routeName">🚃 通勤ルート</h1>
+    <div class="now" id="clock"></div>
+  </div>
+  <div class="dir-toggle">
+    <button class="dir-btn active" data-dir="forward" onclick="setDir('forward')">🏢 出勤</button>
+    <button class="dir-btn" data-dir="backward" onclick="setDir('backward')">🏠 帰宅</button>
+  </div>
+  <button class="search-btn" onclick="doSearch()">🔍 ルートを検索</button>
+</div>
+
+<!-- ========== Results ========== -->
+<div class="results" id="results">
+  <div class="hint">上の「ルートを検索」を<br>タップして検索開始</div>
+</div>
+
+<!-- ========== 備注編集Modal ========== -->
+<div class="modal-overlay" id="noteModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>📝 乗車メモ</h2>
+    <div id="noteModalLegInfo" style="font-size:12px;color:var(--accent2);margin-bottom:4px;font-weight:600;"></div>
+    <div id="noteModalTimeInfo" style="font-size:11px;color:var(--text2);margin-bottom:12px;"></div>
+    <div id="noteTimeToggleArea"></div>
+    <label>到着ホーム</label>
+    <input id="notePlatform" placeholder="例: 3番ホーム">
+    <label>おすすめ車両</label>
+    <input id="noteCar" placeholder="例: 前から3両目">
+    <label>おすすめドア</label>
+    <input id="noteDoor" placeholder="例: 2番ドア">
+    <label>自由メモ</label>
+    <textarea id="noteMemo" placeholder="例: 左の通路で乗換が早い"></textarea>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeNoteModal()">キャンセル</button>
+      <button class="btn-primary" onclick="saveNote()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 設定Modal ========== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" id="settingsContent"></div>
+</div>
+
+<!-- ========== 時刻表編集Modal ========== -->
+<div class="modal-overlay" id="ttModal">
+  <div class="modal" id="ttContent"></div>
+</div>
+
+<!-- ========== メモ管理Modal ========== -->
+<div class="modal-overlay" id="notesListModal">
+  <div class="modal" id="notesListContent"></div>
+</div>
+
+<!-- ========== Bottom Bar ========== -->
+<div class="bottom-bar">
+  <button onclick="openSettings()">⚙️ 設定</button>
+  <button onclick="openTTEditor()">🕐 時刻表</button>
+  <button onclick="openNotesList()">📝 メモ管理</button>
+</div>
+
+<script>
+// ==============================================
+// ===== 設定データ（自分のルートに書き換え） =====
+// ==============================================
+//
+// 【行き（forward）について】
+//   10:30前は route "early"（2回乗換）、10:30以降は route "late"（1回乗換）
+//   それぞれ legs 配列に各区間を定義する。
+//
+// 【備注のキー】
+//   方向 | ルートバリアント | 線路名 | 出発駅 | 到着駅 | 出発時刻(HH帯)
+//   → 同じ出発時刻帯であれば同じメモが表示される
+//
+// ==============================================
+
+const DEFAULT_CONFIG = {
+  routeName: "通勤ルート",
+  // 10:30 が分岐点（分単位: 630）
+  morningCutoffMinutes: 630,
+  searchWindowStart: 6,
+  searchWindowEnd: 15,
+  direction: {
+    // ---- 行き ----
+    forward: {
+      // 2ルート定義: early（10:30前）と late（10:30以降）
+      routes: {
+        early: {
+          label: "10:30前（2回乗換）",
+          legs: [
+            {
+              lineName: "○○線",
+              fromStation: "A駅",
+              toStation: "B駅",
+              ridingMinutes: 15,
+              platformNumber: "2番ホーム",
+              weekday: ["07:00","07:08","07:15","07:22","07:30","07:38","07:45","07:52","08:00","08:10","08:20","08:30","08:45","09:00","09:15","09:30"],
+              holiday: ["07:10","07:30","07:50","08:10","08:30","09:00","09:30"]
+            },
+            {
+              lineName: "△△線",
+              fromStation: "B駅",
+              toStation: "C駅",
+              ridingMinutes: 20,
+              transferMinutes: 2,
+              platformNumber: "5番ホーム",
+              weekday: ["07:05","07:15","07:25","07:35","07:45","07:55","08:05","08:15","08:30","08:45","09:00","09:15","09:30","09:45"],
+              holiday: ["07:20","07:40","08:00","08:20","08:40","09:00","09:30"]
+            },
+            {
+              lineName: "□□線",
+              fromStation: "C駅",
+              toStation: "D駅（会社最寄）",
+              ridingMinutes: 10,
+              transferMinutes: 2,
+              platformNumber: "3番ホーム",
+              weekday: ["07:20","07:30","07:40","07:50","08:00","08:10","08:20","08:35","08:50","09:05","09:20","09:40","10:00"],
+              holiday: ["07:30","08:00","08:30","09:00","09:30","10:00"]
+            }
+          ]
+        },
+        late: {
+          label: "10:30以降（1回乗換）",
+          legs: [
+            {
+              lineName: "○○線",
+              fromStation: "A駅",
+              toStation: "E駅",
+              ridingMinutes: 25,
+              platformNumber: "1番ホーム",
+              weekday: ["09:30","09:45","10:00","10:15","10:30","10:45","11:00","11:15","11:30"],
+              holiday: ["09:30","10:00","10:30","11:00","11:30"]
+            },
+            {
+              lineName: "◇◇線",
+              fromStation: "E駅",
+              toStation: "D駅（会社最寄）",
+              ridingMinutes: 12,
+              transferMinutes: 3,
+              platformNumber: "4番ホーム",
+              weekday: ["09:50","10:05","10:20","10:35","10:50","11:05","11:20","11:40","12:00"],
+              holiday: ["10:00","10:30","11:00","11:30","12:00"]
+            }
+          ]
+        }
+      }
+    },
+    // ---- 帰り ----
+    backward: {
+      routes: {
+        // 帰りは1ルートのみ（"main" という名前で固定）
+        main: {
+          label: "帰宅",
+          legs: [
+            {
+              lineName: "□□線",
+              fromStation: "D駅",
+              toStation: "C駅",
+              ridingMinutes: 10,
+              platformNumber: "1番ホーム",
+              weekday: ["17:00","17:10","17:20","17:30","17:40","17:50","18:00","18:10","18:20","18:30","18:45","19:00","19:15","19:30"],
+              holiday: ["17:00","17:30","18:00","18:30","19:00","19:30"]
+            },
+            {
+              lineName: "△△線",
+              fromStation: "C駅",
+              toStation: "B駅",
+              ridingMinutes: 20,
+              transferMinutes: 2,
+              platformNumber: "4番ホーム",
+              weekday: ["17:05","17:15","17:25","17:35","17:45","17:55","18:05","18:15","18:30","18:45","19:00","19:20","19:40","20:00"],
+              holiday: ["17:10","17:40","18:10","18:40","19:10","19:40","20:10"]
+            },
+            {
+              lineName: "○○線",
+              fromStation: "B駅",
+              toStation: "A駅",
+              ridingMinutes: 15,
+              transferMinutes: 2,
+              platformNumber: "6番ホーム",
+              weekday: ["17:20","17:30","17:40","17:50","18:00","18:10","18:20","18:35","18:50","19:05","19:20","19:40","20:00","20:20"],
+              holiday: ["17:30","18:00","18:30","19:00","19:30","20:00","20:30"]
+            }
+          ]
+        }
+      }
+    }
+  }
+};
+
+// ==============================================
+// ===== ユーティリティ =====
+// ==============================================
+function toMin(s) {
+  const [h, m] = s.split(':').map(Number);
+  return h * 60 + m;
+}
+function toStr(m) {
+  const h = Math.floor(m / 60) % 24;
+  const mm = m % 60;
+  return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+}
+function isWeekday() {
+  const d = new Date().getDay();
+  return d >= 1 && d <= 5;
+}
+function nowMin() {
+  const n = new Date();
+  return n.getHours() * 60 + n.getMinutes();
+}
+
+// ==============================================
+// ===== データ永続化 =====
+// ==============================================
+const STORAGE_KEY = 'commuteConfig_v2';
+const NOTES_KEY   = 'commuteNotes_v2';
+
+function loadConfig() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+}
+function saveConfig(cfg) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+}
+function loadNotes() {
+  const saved = localStorage.getItem(NOTES_KEY);
+  if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+  return {};
+}
+function saveNotes(n) {
+  localStorage.setItem(NOTES_KEY, JSON.stringify(n));
+}
+
+// ========== 備注キー ==========
+// キー形式A（時刻固有）: "方向|ルート|線路名|出発駅|到着駅|HH:MM"
+//   → 7:30発と7:35発でそれぞれ独立したメモ
+// キー形式B（全時刻共通）: 上記の HH:MM 部分を "*"
+function noteKeyExact(dir, routeKey, leg, depMin) {
+  return `${dir}|${routeKey}|${leg.lineName}|${leg.fromStation}|${leg.toStation}|${toStr(depMin)}`;
+}
+function noteKeyGeneric(dir, routeKey, leg) {
+  return `${dir}|${routeKey}|${leg.lineName}|${leg.fromStation}|${leg.toStation}|*`;
+}
+// 表示用: 時刻固有を優先、なければ共通
+function getNoteForLeg(notesObj, dir, routeKey, leg, depMin) {
+  const kExact = noteKeyExact(dir, routeKey, leg, depMin);
+  const kGen   = noteKeyGeneric(dir, routeKey, leg);
+  return notesObj[kExact] || notesObj[kGen] || null;
+}
+
+let config = loadConfig();
+let notes  = loadNotes();
+let currentDir = 'forward';
+let countdownTimer = null;
+
+// 現在の手動ルート選択（null=自動）
+let manualRouteKey = null;
+
+// ==============================================
+// ===== 方向切換 =====
+// ==============================================
+function setDir(dir) {
+  currentDir = dir;
+  manualRouteKey = null;
+  document.querySelectorAll('.dir-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.dir === dir);
+  });
+  document.getElementById('results').innerHTML = '<div class="hint">「ルートを検索」をタップ</div>';
+}
+
+// ==============================================
+// ===== ルート選択ロジック =====
+// ==============================================
+function getActiveRouteKey(dir) {
+  if (manualRouteKey) return manualRouteKey;
+  if (dir === 'forward') {
+    const now = nowMin();
+    const cutoff = config.morningCutoffMinutes || 630;
+    return now < cutoff ? 'early' : 'late';
+  }
+  return 'main';
+}
+
+// ==============================================
+// ===== 検索アルゴリズム =====
+// ==============================================
+function searchRoute(legs, winStart, winEnd) {
+  const wd = isWeekday();
+  const getTT  = (leg) => (wd ? leg.weekday : leg.holiday).map(toMin).sort((a,b)=>a-b);
+  const findNext = (tt, target) => tt.find(t => t >= target) ?? null;
+
+  const tt0 = getTT(legs[0]);
+  let candidates = tt0.filter(t => t >= winStart && t <= winEnd);
+  let fallback = false;
+  if (candidates.length === 0) {
+    const next = findNext(tt0, winStart);
+    if (next !== null) { candidates = [next]; fallback = true; }
+  }
+  if (candidates.length === 0) return { plans: [], fallback: false };
+
+  const plans = [];
+  for (const dep0 of candidates) {
+    let valid = true;
+    const planLegs = [];
+    let arrPrev = dep0 + legs[0].ridingMinutes;
+    planLegs.push({ dep: dep0, arr: arrPrev, leg: legs[0], transfer: null });
+
+    for (let i = 1; i < legs.length; i++) {
+      const leg = legs[i];
+      const transferMin = leg.transferMinutes || 1;
+      const earliest = arrPrev + transferMin;
+      const tt = getTT(leg);
+      const dep = findNext(tt, earliest);
+      if (dep === null) { valid = false; break; }
+      const arr = dep + leg.ridingMinutes;
+      const wait = dep - arrPrev;
+      planLegs.push({ dep, arr, leg, transfer: { wait, station: legs[i-1].toStation } });
+      arrPrev = arr;
+    }
+    if (valid) {
+      plans.push({
+        legs: planLegs,
+        depMin: planLegs[0].dep,
+        arrMin: planLegs[planLegs.length-1].arr,
+        total:  planLegs[planLegs.length-1].arr - planLegs[0].dep
+      });
+    }
+  }
+  return { plans, fallback };
+}
+
+// ==============================================
+// ===== メイン検索 =====
+// ==============================================
+function doSearch() {
+  config = loadConfig();
+  notes  = loadNotes();
+  const now = nowMin();
+  const winStart = now + (config.searchWindowStart || 6);
+  const winEnd   = now + (config.searchWindowEnd   || 15);
+  const routeKey = getActiveRouteKey(currentDir);
+  const routeDef = config.direction[currentDir].routes[routeKey];
+
+  const { plans, fallback } = searchRoute(routeDef.legs, winStart, winEnd);
+
+  let html = '';
+
+  // ---- 行きのみ: ルート切換タブ表示 ----
+  if (currentDir === 'forward') {
+    const routes = config.direction.forward.routes;
+    const cutoff = config.morningCutoffMinutes || 630;
+    html += `<div class="route-tabs">`;
+    Object.keys(routes).forEach(rk => {
+      const active = rk === routeKey ? 'active' : '';
+      html += `<div class="route-tab ${active}" onclick="switchRoute('${rk}')">${routes[rk].label}</div>`;
+    });
+    html += `</div>`;
+    html += `<div class="route-info-box">`;
+    html += `<strong>自動切換:</strong> ${toStr(cutoff)}前 → 2回乗換ルート / ${toStr(cutoff)}以降 → 1回乗換ルート`;
+    html += `</div>`;
+  }
+
+  if (fallback) {
+    const waitExtra = plans.length > 0 ? plans[0].depMin - winStart : 0;
+    html += `<div style="text-align:center;color:var(--orange);font-size:12px;padding:6px 0 10px;font-weight:600;">⏳ 窓口内に便なし　次の便まであと ${waitExtra} 分</div>`;
+  }
+
+  if (plans.length === 0) {
+    html += '<div class="hint">今日はこれ以上便がありません 😴</div>';
+    document.getElementById('results').innerHTML = html;
+    return;
+  }
+
+  plans.forEach((plan, pi) => {
+    const isBest = pi === 0;
+    html += `<div class="plan-card${isBest ? ' best' : ''}">`;
+    html += `<div class="plan-top">`;
+    html += `<div>`;
+    if (isBest) html += `<div class="best-badge">✦ おすすめ</div>`;
+    html += `<div class="plan-times">${toStr(plan.depMin)}<span>→</span>${toStr(plan.arrMin)}</div>`;
+    html += `</div>`;
+    const countdown = plan.depMin - nowMin();
+    html += `<div class="plan-meta">`;
+    html += `<div class="total">⏱ ${plan.total}分</div>`;
+    html += `<div class="countdown" data-dep="${plan.depMin}">あと ${countdown}分</div>`;
+    html += `</div></div>`;
+
+    plan.legs.forEach((pl, li) => {
+      if (pl.transfer) {
+        const w = pl.transfer.wait;
+        const cls = w <= 1 ? 'tight' : w <= 2 ? 'moderate' : 'relaxed';
+        const icon = w <= 1 ? '⚡' : w <= 2 ? '🚶' : '☕';
+        html += `<div class="transfer-tag ${cls}">${icon} ${pl.transfer.station}で乗換 待ち${w}分</div>`;
+      }
+      html += `<div class="leg">`;
+      html += `<div class="leg-dot"></div>`;
+      html += `<div class="leg-info">`;
+      html += `<div class="leg-line">${pl.leg.lineName}</div>`;
+      html += `<div class="leg-stations"><span class="time">${toStr(pl.dep)}</span> ${pl.leg.fromStation} → <span class="time">${toStr(pl.arr)}</span> ${pl.leg.toStation}</div>`;
+      if (pl.leg.platformNumber) {
+        html += `<div class="leg-platform">📍 ${pl.leg.platformNumber}</div>`;
+      }
+
+      // ---- 備注表示（時刻固有 or 共通） ----
+      const n = getNoteForLeg(notes, currentDir, routeKey, pl.leg, pl.dep);
+      html += `<div class="notes-tags">`;
+      if (n) {
+        if (n.platform) html += `<span class="note-tag">📍 ${n.platform}</span>`;
+        if (n.car)      html += `<span class="note-tag">🚃 ${n.car}</span>`;
+        if (n.door)     html += `<span class="note-tag">🚪 ${n.door}</span>`;
+        if (n.memo)     html += `<span class="note-tag">💬 ${n.memo}</span>`;
+        // 時刻固有か共通かを表示
+        const kExact = noteKeyExact(currentDir, routeKey, pl.leg, pl.dep);
+        if (notes[kExact]) {
+          html += `<span class="note-time-badge">🕐 ${toStr(pl.dep)}発</span>`;
+        } else {
+          html += `<span class="note-time-badge" style="background:#f0fdf4;color:#166534;border-color:#bbf7d0;">📋 全便共通</span>`;
+        }
+      }
+      html += `<span class="note-edit-btn" onclick="openNoteModal('${currentDir}','${routeKey}',${li},${pl.dep})">✏️ メモ</span>`;
+      html += `</div>`;
+      html += `</div></div>`;
+    });
+    html += `</div>`;
+  });
+
+  document.getElementById('results').innerHTML = html;
+  startCountdown();
+}
+
+function switchRoute(rk) {
+  manualRouteKey = rk;
+  doSearch();
+}
+
+// ==============================================
+// ===== カウントダウン =====
+// ==============================================
+function startCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    const now = nowMin();
+    document.querySelectorAll('.countdown').forEach(el => {
+      const dep = parseInt(el.dataset.dep);
+      const left = dep - now;
+      if (left <= 0) {
+        el.textContent = '出発済み';
+        el.style.color = 'var(--red)';
+      } else {
+        el.textContent = `あと ${left}分`;
+        el.style.color = '';
+      }
+    });
+  }, 15000);
+}
+
+// ==============================================
+// ===== 備注モーダル =====
+// ==============================================
+let editingNoteKey = '';
+let editingNoteKeyGeneric = '';
+
+function openNoteModal(dir, routeKey, legIdx, depMin) {
+  config = loadConfig();
+  notes  = loadNotes();
+  const leg    = config.direction[dir].routes[routeKey].legs[legIdx];
+  const kExact = noteKeyExact(dir, routeKey, leg, depMin);
+  const kGen   = noteKeyGeneric(dir, routeKey, leg);
+  editingNoteKey        = kExact;
+  editingNoteKeyGeneric = kGen;
+
+  // 優先順: 時刻固有 > 共通
+  const n = notes[kExact] || notes[kGen] || {};
+  const isGeneric = !notes[kExact] && !!notes[kGen];
+
+  document.getElementById('noteModalLegInfo').textContent  = `${leg.lineName}：${leg.fromStation} → ${leg.toStation}`;
+  document.getElementById('noteModalTimeInfo').textContent = `この便の出発 ${toStr(depMin)}`;
+  document.getElementById('notePlatform').value = n.platform || leg.platformNumber || '';
+  document.getElementById('noteCar').value      = n.car  || '';
+  document.getElementById('noteDoor').value     = n.door || '';
+  document.getElementById('noteMemo').value     = n.memo || '';
+
+  const toggleArea = document.getElementById('noteTimeToggleArea');
+  const modeExact = !isGeneric;
+  toggleArea.innerHTML = `
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+      <button onclick="setSaveMode('exact')" id="modeBtnExact"
+        style="flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+               border:1.5px solid ${modeExact ? 'var(--accent)' : 'var(--border)'};
+               background:${modeExact ? 'var(--accent-light)' : 'var(--surface2)'};
+               color:${modeExact ? 'var(--accent)' : 'var(--text2)'};">
+        🕐 ${toStr(depMin)}発専用
+      </button>
+      <button onclick="setSaveMode('generic')" id="modeBtnGeneric"
+        style="flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+               border:1.5px solid ${!modeExact ? 'var(--accent)' : 'var(--border)'};
+               background:${!modeExact ? 'var(--accent-light)' : 'var(--surface2)'};
+               color:${!modeExact ? 'var(--accent)' : 'var(--text2)'};">
+        📋 全便共通
+      </button>
+    </div>
+    <div id="saveModeHint" style="font-size:11px;color:var(--text2);margin-bottom:10px;">
+      ${modeExact ? `✅ ${toStr(depMin)}発の便だけに表示されるメモ` : '✅ この区間の全便に表示されるメモ'}
+    </div>
+  `;
+  document.getElementById('saveMode').value = modeExact ? 'exact' : 'generic';
+  document.getElementById('noteModal').classList.add('show');
+}
+
+function setSaveMode(mode) {
+  document.getElementById('saveMode').value = mode;
+  const depStr = editingNoteKey.split('|').pop(); // HH:MM
+  document.getElementById('saveModeHint').textContent =
+    mode === 'exact'
+      ? `✅ ${depStr}発の便だけに表示されるメモ`
+      : '✅ この区間の全便に表示されるメモ';
+
+  const btnE = document.getElementById('modeBtnExact');
+  const btnG = document.getElementById('modeBtnGeneric');
+  btnE.style.borderColor = mode === 'exact' ? 'var(--accent)' : 'var(--border)';
+  btnE.style.background  = mode === 'exact' ? 'var(--accent-light)' : 'var(--surface2)';
+  btnE.style.color       = mode === 'exact' ? 'var(--accent)' : 'var(--text2)';
+  btnG.style.borderColor = mode === 'generic' ? 'var(--accent)' : 'var(--border)';
+  btnG.style.background  = mode === 'generic' ? 'var(--accent-light)' : 'var(--surface2)';
+  btnG.style.color       = mode === 'generic' ? 'var(--accent)' : 'var(--text2)';
+}
+
+function closeNoteModal() {
+  document.getElementById('noteModal').classList.remove('show');
+}
+function saveNote() {
+  const mode = document.getElementById('saveMode').value;
+  const key  = mode === 'generic' ? editingNoteKeyGeneric : editingNoteKey;
+  notes[key] = {
+    platform: document.getElementById('notePlatform').value.trim(),
+    car:      document.getElementById('noteCar').value.trim(),
+    door:     document.getElementById('noteDoor').value.trim(),
+    memo:     document.getElementById('noteMemo').value.trim()
+  };
+  saveNotes(notes);
+  closeNoteModal();
+  doSearch();
+}
+
+// ==============================================
+// ===== 設定モーダル =====
+// ==============================================
+function openSettings() {
+  config = loadConfig();
+  let html = '<div class="modal-handle"></div><h2>⚙️ 設定</h2>';
+  const cutoff = config.morningCutoffMinutes || 630;
+  const ch = Math.floor(cutoff/60), cm = cutoff%60;
+  html += `<label>早朝/通常の切換時刻</label>`;
+  html += `<input type="time" id="setCutoff" value="${String(ch).padStart(2,'0')}:${String(cm).padStart(2,'0')}">`;
+  html += `<label>検索窓口 開始（現在 + X分）</label>`;
+  html += `<input type="number" id="setWinStart" value="${config.searchWindowStart}" min="0" max="60">`;
+  html += `<label>検索窓口 終了（現在 + X分）</label>`;
+  html += `<input type="number" id="setWinEnd" value="${config.searchWindowEnd}" min="1" max="120">`;
+
+  ['forward','backward'].forEach(dir => {
+    const dirLabel = dir === 'forward' ? '行き' : '帰り';
+    Object.keys(config.direction[dir].routes).forEach(rk => {
+      config.direction[dir].routes[rk].legs.forEach((leg, i) => {
+        if (leg.transferMinutes !== undefined) {
+          html += `<label>${dirLabel}(${rk}) ${leg.fromStation}での最短乗換時間（分）</label>`;
+          html += `<input type="number" class="transfer-input" data-dir="${dir}" data-route="${rk}" data-idx="${i}" value="${leg.transferMinutes}" min="0" max="30">`;
+        }
+      });
+    });
+  });
+
+  html += '<div class="modal-actions">';
+  html += '<button class="btn-secondary" onclick="closeSettings()">キャンセル</button>';
+  html += '<button class="btn-primary" onclick="saveSettings()">保存</button>';
+  html += '</div>';
+  document.getElementById('settingsContent').innerHTML = html;
+  document.getElementById('settingsModal').classList.add('show');
+}
+function closeSettings() { document.getElementById('settingsModal').classList.remove('show'); }
+function saveSettings() {
+  const cutoffStr = document.getElementById('setCutoff').value;
+  if (cutoffStr) {
+    const [ch, cm] = cutoffStr.split(':').map(Number);
+    config.morningCutoffMinutes = ch * 60 + cm;
+  }
+  config.searchWindowStart = parseInt(document.getElementById('setWinStart').value) || 6;
+  config.searchWindowEnd   = parseInt(document.getElementById('setWinEnd').value)   || 15;
+  document.querySelectorAll('.transfer-input').forEach(inp => {
+    config.direction[inp.dataset.dir].routes[inp.dataset.route].legs[parseInt(inp.dataset.idx)].transferMinutes = parseInt(inp.value) || 1;
+  });
+  saveConfig(config);
+  closeSettings();
+}
+
+// ==============================================
+// ===== 時刻表編集 =====
+// ==============================================
+function openTTEditor() {
+  config = loadConfig();
+  let html = '<div class="modal-handle"></div><h2>🕐 時刻表編集</h2>';
+  ['forward','backward'].forEach(dir => {
+    const dirLabel = dir === 'forward' ? '🏢 行き' : '🏠 帰り';
+    html += `<h3 style="color:var(--accent);margin:14px 0 6px;font-size:14px;">${dirLabel}</h3>`;
+    Object.keys(config.direction[dir].routes).forEach(rk => {
+      const route = config.direction[dir].routes[rk];
+      html += `<div style="font-size:12px;color:var(--accent2);font-weight:700;margin:8px 0 4px;">▸ ${route.label}</div>`;
+      route.legs.forEach((leg, li) => {
+        html += `<div class="tt-section">`;
+        html += `<h3>${leg.lineName}：${leg.fromStation}発</h3>`;
+        ['weekday','holiday'].forEach(dayType => {
+          const label = dayType === 'weekday' ? '平日' : '土休日';
+          const times = leg[dayType] || [];
+          html += `<div style="margin:4px 0 2px;font-size:11px;color:var(--text2);">${label}</div>`;
+          html += `<div class="tt-chips" id="ttchips_${dir}_${rk}_${li}_${dayType}">`;
+          times.forEach((t, ti) => {
+            html += `<span class="tt-chip">${t}<span class="del" onclick="removeTT('${dir}','${rk}',${li},'${dayType}',${ti})">×</span></span>`;
+          });
+          html += `</div>`;
+          html += `<div class="add-time-row">`;
+          html += `<input type="time" id="addtt_${dir}_${rk}_${li}_${dayType}">`;
+          html += `<button onclick="addTT('${dir}','${rk}',${li},'${dayType}')">追加</button>`;
+          html += `</div>`;
+        });
+        html += `</div>`;
+      });
+    });
+  });
+  html += '<div class="modal-actions"><button class="btn-primary" onclick="closeTTEditor()">完了</button></div>';
+  document.getElementById('ttContent').innerHTML = html;
+  document.getElementById('ttModal').classList.add('show');
+}
+function closeTTEditor() { document.getElementById('ttModal').classList.remove('show'); }
+function addTT(dir, rk, li, dayType) {
+  const inp = document.getElementById(`addtt_${dir}_${rk}_${li}_${dayType}`);
+  if (!inp.value) return;
+  const t = inp.value.substring(0,5);
+  config.direction[dir].routes[rk].legs[li][dayType].push(t);
+  config.direction[dir].routes[rk].legs[li][dayType].sort();
+  saveConfig(config);
+  openTTEditor();
+}
+function removeTT(dir, rk, li, dayType, ti) {
+  config.direction[dir].routes[rk].legs[li][dayType].splice(ti, 1);
+  saveConfig(config);
+  openTTEditor();
+}
+
+// ==============================================
+// ===== メモ管理 =====
+// ==============================================
+function openNotesList() {
+  notes = loadNotes();
+  let html = '<div class="modal-handle"></div><h2>📝 メモ管理</h2>';
+  const keys = Object.keys(notes);
+  if (keys.length === 0) {
+    html += '<div style="color:var(--text2);padding:30px 0;text-align:center;font-size:14px;">まだメモはありません</div>';
+  } else {
+    keys.forEach(k => {
+      const n = notes[k];
+      const parts = k.split('|');
+      // parts: [dir, routeKey, lineName, from, to, HH:MM/*]
+      const timeLabel = parts[5] === '*' ? '全便共通' : `${parts[5]}発専用`;
+      html += `<div class="note-list-item">`;
+      html += `<span class="del-note" onclick="deleteNote('${k}')">🗑 削除</span>`;
+      html += `<div class="key">${parts[2]}：${parts[3]} → ${parts[4]}</div>`;
+      html += `<div style="font-size:10px;color:var(--text2);margin-bottom:4px;">🕐 ${timeLabel}</div>`;
+      const vals = [];
+      if (n.platform) vals.push('📍 ' + n.platform);
+      if (n.car)      vals.push('🚃 ' + n.car);
+      if (n.door)     vals.push('🚪 ' + n.door);
+      if (n.memo)     vals.push('💬 ' + n.memo);
+      html += `<div class="vals">${vals.join(' &nbsp;|&nbsp; ') || '（内容なし）'}</div>`;
+      html += `</div>`;
+    });
+  }
+  html += '<div class="modal-actions"><button class="btn-primary" onclick="closeNotesList()">閉じる</button></div>';
+  document.getElementById('notesListContent').innerHTML = html;
+  document.getElementById('notesListModal').classList.add('show');
+}
+function closeNotesList() { document.getElementById('notesListModal').classList.remove('show'); }
+function deleteNote(k) {
+  delete notes[k];
+  saveNotes(notes);
+  openNotesList();
+}
+
+// ==============================================
+// ===== 時計 & 初期化 =====
+// ==============================================
+// saveMode用の隠しinputを追加
+document.body.insertAdjacentHTML('beforeend', '<input type="hidden" id="saveMode" value="hour">');
+
+function updateClock() {
+  const n = new Date();
+  const day = ['日','月','火','水','木','金','土'][n.getDay()];
+  const wd  = isWeekday() ? '平日' : '土休日';
+  document.getElementById('clock').textContent =
+    `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')} ${day} ${wd}`;
+}
+setInterval(updateClock, 10000);
+updateClock();
+
+document.getElementById('routeName').textContent = '🚃 ' + config.routeName;
+
+// モーダルの外タップで閉じる
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('show');
+  });
+});
+
+// ==============================================
+// ===== Service Worker（オフライン対応） =====
+// ==============================================
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    self.addEventListener('install', e => self.skipWaiting());
+    self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+    self.addEventListener('fetch', e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+}
+</script>
+</body>
+</html>
