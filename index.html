@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>通勤ルート</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoi6YCa5YukIOODq+ODvOODiOaknOe0oiIsInNob3J0X25hbWUiOiLpgJrli6Tmo5zntKIiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI2YwZjRmZiIsInRoZW1lX2NvbG9yIjoiIzQxNzNmNiJ9">
+<meta name="theme-color" content="#4173f6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#f0f4ff; --surface:#ffffff; --surface2:#f8f9fb;
+  --accent:#4173f6; --accent2:#7c5cfc; --accent-light:#e8eeff;
+  --text:#1a1d2e; --text2:#6b7280; --text3:#9ca3af;
+  --red:#ef4444; --orange:#f97316; --green:#22c55e;
+  --border:#e5e9f2;
+  --shadow:0 1px 3px rgba(65,115,246,0.08),0 4px 16px rgba(65,115,246,0.06);
+  --radius:14px;
+}
+*{-webkit-tap-highlight-color:transparent;}
+body {
+  font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;
+  background:var(--bg); color:var(--text); min-height:100vh;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+}
+.header {
+  position:sticky; top:0; z-index:100;
+  background:rgba(240,244,255,0.93);
+  backdrop-filter:blur(16px) saturate(180%);
+  -webkit-backdrop-filter:blur(16px) saturate(180%);
+  padding:12px 16px 10px; border-bottom:1px solid var(--border);
+}
+.header-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.header h1  { font-size:17px; font-weight:700; letter-spacing:-0.3px; }
+.header .now {
+  font-size:12px; color:var(--text2); background:var(--surface);
+  border-radius:20px; padding:4px 10px; border:1px solid var(--border);
+}
+.dir-toggle { display:flex; gap:6px; margin-bottom:10px; }
+.dir-btn {
+  flex:1; padding:9px 8px; text-align:center; font-size:14px; font-weight:600;
+  background:var(--surface); color:var(--text2);
+  border:1px solid var(--border); border-radius:10px; cursor:pointer; transition:all 0.18s;
+}
+.dir-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 2px 8px rgba(65,115,246,0.3); }
+.search-btn {
+  width:100%; padding:11px; border:none; border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff; font-size:15px; font-weight:700; cursor:pointer;
+  box-shadow:0 2px 10px rgba(65,115,246,0.35); transition:transform 0.1s;
+}
+.search-btn:active { transform:scale(0.97); }
+
+.results { padding:14px 16px; }
+.results .hint { text-align:center; color:var(--text3); padding:50px 0; font-size:14px; line-height:1.8; }
+
+.route-tabs { display:flex; gap:8px; margin-bottom:12px; }
+.route-tab {
+  flex:1; padding:9px 6px; text-align:center; font-size:13px; font-weight:600;
+  border-radius:10px; border:1.5px solid var(--border);
+  background:var(--surface); color:var(--text2); cursor:pointer; transition:all 0.18s;
+}
+.route-tab.active { border-color:var(--accent); background:var(--accent-light); color:var(--accent); }
+.route-info-box {
+  background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:10px 12px; margin-bottom:12px; font-size:12px; color:var(--text2); line-height:1.6;
+}
+.route-info-box strong { color:var(--text); }
+
+.plan-card {
+  background:var(--surface); border-radius:var(--radius); padding:14px;
+  margin-bottom:10px; border:1.5px solid var(--border); box-shadow:var(--shadow);
+}
+.plan-card.best { border-color:var(--accent); }
+.plan-top {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border);
+}
+.plan-times { font-size:22px; font-weight:700; letter-spacing:-0.5px; }
+.plan-times span { color:var(--text3); font-size:13px; font-weight:400; margin:0 6px; }
+.plan-meta { text-align:right; }
+.plan-meta .total { font-size:12px; color:var(--accent2); font-weight:700; }
+.plan-meta .countdown { font-size:12px; color:var(--text2); margin-top:3px; background:var(--surface2); padding:2px 8px; border-radius:10px; }
+.best-badge { font-size:10px; font-weight:700; color:var(--accent); background:var(--accent-light); padding:2px 7px; border-radius:6px; margin-bottom:4px; display:inline-block; }
+
+.leg { display:flex; gap:10px; margin-bottom:8px; position:relative; padding-left:20px; }
+.leg::before { content:''; position:absolute; left:7px; top:10px; bottom:-8px; width:1.5px; background:var(--border); }
+.leg:last-of-type::before { display:none; }
+.leg-dot { position:absolute; left:3px; top:7px; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px var(--accent-light); }
+.leg-info { flex:1; }
+.leg-line { font-size:11px; color:var(--accent2); font-weight:700; margin-bottom:2px; }
+.leg-stations { font-size:14px; margin-bottom:3px; }
+.leg-stations .time { font-weight:700; }
+
+.transfer-tag { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:600; padding:3px 9px; border-radius:6px; margin:4px 0 6px 0; }
+.transfer-tag.tight    { background:#fef2f2; color:var(--red);    border:1px solid #fecaca; }
+.transfer-tag.moderate { background:#fff7ed; color:var(--orange);  border:1px solid #fed7aa; }
+.transfer-tag.relaxed  { background:#f0fdf4; color:var(--green);   border:1px solid #bbf7d0; }
+
+.notes-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+.note-tag { font-size:11px; padding:3px 8px; border-radius:6px; background:var(--accent-light); color:var(--accent); font-weight:500; }
+.note-edit-btn { font-size:11px; padding:3px 8px; border-radius:6px; background:var(--surface2); color:var(--text2); border:1px dashed var(--border); cursor:pointer; }
+.note-edit-btn:active { background:var(--accent-light); }
+.note-time-badge { font-size:10px; padding:2px 6px; border-radius:5px; background:#fef9c3; color:#a16207; border:1px solid #fde68a; font-weight:600; }
+
+.modal-overlay {
+  display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(10,10,30,0.35); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  align-items:flex-end; justify-content:center;
+}
+.modal-overlay.show { display:flex; }
+.modal {
+  background:var(--surface); border-radius:20px 20px 0 0;
+  width:100%; max-width:520px; max-height:88vh; overflow-y:auto;
+  padding:20px 16px; padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  box-shadow:0 -4px 30px rgba(0,0,0,0.12);
+}
+.modal-handle { width:36px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 16px; }
+.modal h2 { font-size:17px; font-weight:700; margin-bottom:14px; }
+.modal h3 { font-size:14px; font-weight:700; color:var(--accent); margin:18px 0 8px; border-top:1px solid var(--border); padding-top:14px; }
+.modal h3:first-of-type { border-top:none; padding-top:0; margin-top:4px; }
+.modal h4 { font-size:12px; font-weight:700; color:var(--accent2); margin:12px 0 5px; }
+.modal label { display:block; font-size:13px; color:var(--text2); margin:12px 0 4px; font-weight:500; }
+.modal input,.modal textarea,.modal select {
+  width:100%; padding:11px 12px; border-radius:10px; border:1.5px solid var(--border);
+  background:var(--surface2); color:var(--text); font-size:14px; transition:border-color 0.15s; -webkit-appearance:none;
+}
+.modal input:focus,.modal textarea:focus { outline:none; border-color:var(--accent); background:var(--surface); }
+.modal textarea { min-height:90px; resize:vertical; font-family:monospace; font-size:13px; }
+.modal-actions { display:flex; gap:8px; margin-top:18px; }
+.modal-actions button { flex:1; padding:12px; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; }
+.modal-actions button:active { opacity:0.75; }
+.btn-primary   { background:var(--accent); color:#fff; }
+.btn-secondary { background:var(--surface2); color:var(--text2); border:1px solid var(--border); }
+
+.bottom-bar {
+  position:fixed; bottom:0; left:0; right:0;
+  background:rgba(240,244,255,0.94); backdrop-filter:blur(16px) saturate(180%); -webkit-backdrop-filter:blur(16px) saturate(180%);
+  border-top:1px solid var(--border); display:flex;
+  padding:8px 12px; padding-bottom:calc(8px + env(safe-area-inset-bottom)); gap:8px;
+}
+.bottom-bar button {
+  flex:1; padding:9px 4px; border:none; border-radius:10px;
+  background:var(--surface); color:var(--text2); font-size:11px; font-weight:600;
+  cursor:pointer; border:1px solid var(--border); transition:all 0.15s;
+}
+.bottom-bar button:active { background:var(--accent-light); color:var(--accent); border-color:var(--accent); }
+
+/* ===== 時刻表 UI ===== */
+.leg-tt-box { background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; }
+.tt-pair-list { display:flex; flex-direction:column; gap:4px; margin-bottom:6px; max-height:160px; overflow-y:auto; }
+.tt-pair-row { display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px; }
+.tt-pair-row .times { flex:1; font-weight:600; }
+.tt-pair-row .del-pair { color:var(--red); cursor:pointer; font-size:18px; line-height:1; padding:0 2px; }
+.tt-add-row { display:flex; gap:6px; align-items:center; margin-top:6px; }
+.tt-add-row input[type=time] { flex:1; }
+.tt-add-row span { font-size:12px; color:var(--text2); flex-shrink:0; }
+.tt-add-row .add-btn { padding:9px 12px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-size:13px; cursor:pointer; font-weight:600; flex-shrink:0; }
+.csv-area { margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+.csv-label { font-size:11px; color:var(--text2); margin-bottom:3px; display:block; font-weight:700; }
+.csv-help { font-size:11px; color:var(--text3); margin-bottom:5px; line-height:1.5; }
+.csv-btns { display:flex; gap:6px; margin-top:6px; }
+.csv-btn { flex:1; padding:8px 6px; border:none; border-radius:8px; font-size:12px; cursor:pointer; font-weight:600; }
+.csv-btn.add     { background:var(--accent2); color:#fff; }
+.csv-btn.replace { background:var(--red);    color:#fff; }
+
+/* ===== 乗換時間設定 ===== */
+.transfer-row {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; background:var(--surface2);
+  border:1px solid var(--border); border-radius:10px; margin-bottom:8px;
+}
+.transfer-row .tr-label { flex:1; font-size:13px; }
+.transfer-row .tr-label small { display:block; color:var(--text2); font-size:11px; margin-top:1px; }
+.transfer-row input[type=number] { width:60px; text-align:center; padding:8px 6px; font-size:15px; font-weight:700; }
+.transfer-row .tr-unit { font-size:12px; color:var(--text2); }
+
+/* ===== メモ管理 ===== */
+.note-list-item { padding:12px; background:var(--surface2); border-radius:10px; margin-bottom:8px; font-size:13px; border:1px solid var(--border); }
+.note-list-item .nkey  { color:var(--accent); font-weight:700; margin-bottom:3px; font-size:12px; }
+.note-list-item .nvals { color:var(--text2); line-height:1.6; }
+.note-list-item .del-note { color:var(--red); font-size:12px; cursor:pointer; float:right; font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <h1 id="routeName">🚃 通勤ルート</h1>
+    <div class="now" id="clock"></div>
+  </div>
+  <div class="dir-toggle">
+    <button class="dir-btn active" data-dir="forward" onclick="setDir('forward')">🏢 出勤</button>
+    <button class="dir-btn" data-dir="backward" onclick="setDir('backward')">🏠 帰宅</button>
+  </div>
+  <button class="search-btn" onclick="doSearch()">🔍 ルートを検索</button>
+</div>
+
+<div class="results" id="results">
+  <div class="hint">上の「ルートを検索」を<br>タップして検索開始</div>
+</div>
+
+<!-- 乗車メモ -->
+<div class="modal-overlay" id="noteModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>📝 乗車メモ</h2>
+    <div id="noteModalLegInfo"  style="font-size:12px;color:var(--accent2);margin-bottom:3px;font-weight:600;"></div>
+    <div id="noteModalTimeInfo" style="font-size:11px;color:var(--text2);margin-bottom:12px;"></div>
+    <div id="noteTimeToggleArea"></div>
+    <label>到着ホーム</label>
+    <input id="notePlatform" placeholder="例: 3番ホーム">
+    <label>おすすめ車両</label>
+    <input id="noteCar" placeholder="例: 前から3両目">
+    <label>おすすめドア</label>
+    <input id="noteDoor" placeholder="例: 2番ドア">
+    <label>自由メモ</label>
+    <textarea id="noteMemo" placeholder="例: 左の通路で乗換が早い" style="font-family:inherit;font-size:14px;min-height:60px;"></textarea>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeNoteModal()">キャンセル</button>
+      <button class="btn-primary"   onclick="saveNote()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div class="modal-overlay" id="settingsModal"><div class="modal" id="settingsContent"></div></div>
+<!-- 時刻表 -->
+<div class="modal-overlay" id="ttModal"><div class="modal" id="ttContent"></div></div>
+<!-- メモ管理 -->
+<div class="modal-overlay" id="notesListModal"><div class="modal" id="notesListContent"></div></div>
+
+<div class="bottom-bar">
+  <button onclick="openSettings()">⚙️ 設定</button>
+  <button onclick="openTTEditor()">🕐 時刻表</button>
+  <button onclick="openNotesList()">📝 メモ管理</button>
+</div>
+
+<script>
+// ============================================================
+// データ構造（モードB）
+// 各 leg.trips = { wd:[{dep:"07:30",arr:"07:45"},...], hd:[...] }
+// wd=平日, hd=土休日
+// platformNumber は廃止。乗換時間はアプリ内で設定（デフォルト1分）
+// ============================================================
+const DEFAULT_CONFIG = {
+  routeName: "通勤ルート",
+  morningCutoffMinutes: 630,  // 10:30
+  searchWindowStart: 6,
+  searchWindowEnd: 15,
+  direction: {
+    forward: {
+      routes: {
+        early: {
+          label: "10:30前（2回乗換）",
+          legs: [
+            {
+              lineName: "○○線",
+              fromStation: "A駅",
+              toStation: "B駅",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"07:00",arr:"07:15"},{dep:"07:08",arr:"07:23"},
+                  {dep:"07:15",arr:"07:30"},{dep:"07:22",arr:"07:37"},
+                  {dep:"07:30",arr:"07:45"},{dep:"07:38",arr:"07:53"},
+                  {dep:"07:45",arr:"08:00"},{dep:"07:52",arr:"08:07"},
+                  {dep:"08:00",arr:"08:15"},{dep:"08:10",arr:"08:25"},
+                  {dep:"08:20",arr:"08:35"},{dep:"08:30",arr:"08:45"},
+                  {dep:"08:45",arr:"09:00"},{dep:"09:00",arr:"09:15"},
+                  {dep:"09:15",arr:"09:30"},{dep:"09:30",arr:"09:45"}
+                ],
+                hd: [
+                  {dep:"07:10",arr:"07:25"},{dep:"07:30",arr:"07:45"},
+                  {dep:"07:50",arr:"08:05"},{dep:"08:10",arr:"08:25"},
+                  {dep:"08:30",arr:"08:45"},{dep:"09:00",arr:"09:15"},
+                  {dep:"09:30",arr:"09:45"}
+                ]
+              }
+            },
+            {
+              lineName: "△△線",
+              fromStation: "B駅",
+              toStation: "C駅",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"07:05",arr:"07:25"},{dep:"07:15",arr:"07:35"},
+                  {dep:"07:25",arr:"07:45"},{dep:"07:35",arr:"07:55"},
+                  {dep:"07:45",arr:"08:05"},{dep:"07:55",arr:"08:15"},
+                  {dep:"08:05",arr:"08:25"},{dep:"08:15",arr:"08:35"},
+                  {dep:"08:30",arr:"08:50"},{dep:"08:45",arr:"09:05"},
+                  {dep:"09:00",arr:"09:20"},{dep:"09:15",arr:"09:35"},
+                  {dep:"09:30",arr:"09:50"},{dep:"09:45",arr:"10:05"}
+                ],
+                hd: [
+                  {dep:"07:20",arr:"07:40"},{dep:"07:40",arr:"08:00"},
+                  {dep:"08:00",arr:"08:20"},{dep:"08:20",arr:"08:40"},
+                  {dep:"08:40",arr:"09:00"},{dep:"09:00",arr:"09:20"},
+                  {dep:"09:30",arr:"09:50"}
+                ]
+              }
+            },
+            {
+              lineName: "□□線",
+              fromStation: "C駅",
+              toStation: "D駅（会社最寄）",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"07:20",arr:"07:30"},{dep:"07:30",arr:"07:40"},
+                  {dep:"07:40",arr:"07:50"},{dep:"07:50",arr:"08:00"},
+                  {dep:"08:00",arr:"08:10"},{dep:"08:10",arr:"08:20"},
+                  {dep:"08:20",arr:"08:30"},{dep:"08:35",arr:"08:45"},
+                  {dep:"08:50",arr:"09:00"},{dep:"09:05",arr:"09:15"},
+                  {dep:"09:20",arr:"09:30"},{dep:"09:40",arr:"09:50"},
+                  {dep:"10:00",arr:"10:10"}
+                ],
+                hd: [
+                  {dep:"07:30",arr:"07:40"},{dep:"08:00",arr:"08:10"},
+                  {dep:"08:30",arr:"08:40"},{dep:"09:00",arr:"09:10"},
+                  {dep:"09:30",arr:"09:40"},{dep:"10:00",arr:"10:10"}
+                ]
+              }
+            }
+          ]
+        },
+        late: {
+          label: "10:30以降（1回乗換）",
+          legs: [
+            {
+              lineName: "○○線",
+              fromStation: "A駅",
+              toStation: "E駅",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"09:30",arr:"09:55"},{dep:"09:45",arr:"10:10"},
+                  {dep:"10:00",arr:"10:25"},{dep:"10:15",arr:"10:40"},
+                  {dep:"10:30",arr:"10:55"},{dep:"10:45",arr:"11:10"},
+                  {dep:"11:00",arr:"11:25"},{dep:"11:15",arr:"11:40"},
+                  {dep:"11:30",arr:"11:55"}
+                ],
+                hd: [
+                  {dep:"09:30",arr:"09:55"},{dep:"10:00",arr:"10:25"},
+                  {dep:"10:30",arr:"10:55"},{dep:"11:00",arr:"11:25"},
+                  {dep:"11:30",arr:"11:55"}
+                ]
+              }
+            },
+            {
+              lineName: "◇◇線",
+              fromStation: "E駅",
+              toStation: "D駅（会社最寄）",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"09:50",arr:"10:02"},{dep:"10:05",arr:"10:17"},
+                  {dep:"10:20",arr:"10:32"},{dep:"10:35",arr:"10:47"},
+                  {dep:"10:50",arr:"11:02"},{dep:"11:05",arr:"11:17"},
+                  {dep:"11:20",arr:"11:32"},{dep:"11:40",arr:"11:52"},
+                  {dep:"12:00",arr:"12:12"}
+                ],
+                hd: [
+                  {dep:"10:00",arr:"10:12"},{dep:"10:30",arr:"10:42"},
+                  {dep:"11:00",arr:"11:12"},{dep:"11:30",arr:"11:42"},
+                  {dep:"12:00",arr:"12:12"}
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    backward: {
+      routes: {
+        main: {
+          label: "帰宅",
+          legs: [
+            {
+              lineName: "□□線",
+              fromStation: "D駅",
+              toStation: "C駅",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"17:00",arr:"17:10"},{dep:"17:10",arr:"17:20"},
+                  {dep:"17:20",arr:"17:30"},{dep:"17:30",arr:"17:40"},
+                  {dep:"17:40",arr:"17:50"},{dep:"17:50",arr:"18:00"},
+                  {dep:"18:00",arr:"18:10"},{dep:"18:10",arr:"18:20"},
+                  {dep:"18:20",arr:"18:30"},{dep:"18:30",arr:"18:40"},
+                  {dep:"18:45",arr:"18:55"},{dep:"19:00",arr:"19:10"},
+                  {dep:"19:15",arr:"19:25"},{dep:"19:30",arr:"19:40"}
+                ],
+                hd: [
+                  {dep:"17:00",arr:"17:10"},{dep:"17:30",arr:"17:40"},
+                  {dep:"18:00",arr:"18:10"},{dep:"18:30",arr:"18:40"},
+                  {dep:"19:00",arr:"19:10"},{dep:"19:30",arr:"19:40"}
+                ]
+              }
+            },
+            {
+              lineName: "△△線",
+              fromStation: "C駅",
+              toStation: "B駅",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"17:05",arr:"17:25"},{dep:"17:15",arr:"17:35"},
+                  {dep:"17:25",arr:"17:45"},{dep:"17:35",arr:"17:55"},
+                  {dep:"17:45",arr:"18:05"},{dep:"17:55",arr:"18:15"},
+                  {dep:"18:05",arr:"18:25"},{dep:"18:15",arr:"18:35"},
+                  {dep:"18:30",arr:"18:50"},{dep:"18:45",arr:"19:05"},
+                  {dep:"19:00",arr:"19:20"},{dep:"19:20",arr:"19:40"},
+                  {dep:"19:40",arr:"20:00"},{dep:"20:00",arr:"20:20"}
+                ],
+                hd: [
+                  {dep:"17:10",arr:"17:30"},{dep:"17:40",arr:"18:00"},
+                  {dep:"18:10",arr:"18:30"},{dep:"18:40",arr:"19:00"},
+                  {dep:"19:10",arr:"19:30"},{dep:"19:40",arr:"20:00"},
+                  {dep:"20:10",arr:"20:30"}
+                ]
+              }
+            },
+            {
+              lineName: "○○線",
+              fromStation: "B駅",
+              toStation: "A駅",
+              transferMinutes: 1,
+              trips: {
+                wd: [
+                  {dep:"17:20",arr:"17:35"},{dep:"17:30",arr:"17:45"},
+                  {dep:"17:40",arr:"17:55"},{dep:"17:50",arr:"18:05"},
+                  {dep:"18:00",arr:"18:15"},{dep:"18:10",arr:"18:25"},
+                  {dep:"18:20",arr:"18:35"},{dep:"18:35",arr:"18:50"},
+                  {dep:"18:50",arr:"19:05"},{dep:"19:05",arr:"19:20"},
+                  {dep:"19:20",arr:"19:35"},{dep:"19:40",arr:"19:55"},
+                  {dep:"20:00",arr:"20:15"},{dep:"20:20",arr:"20:35"}
+                ],
+                hd: [
+                  {dep:"17:30",arr:"17:45"},{dep:"18:00",arr:"18:15"},
+                  {dep:"18:30",arr:"18:45"},{dep:"19:00",arr:"19:15"},
+                  {dep:"19:30",arr:"19:45"},{dep:"20:00",arr:"20:15"},
+                  {dep:"20:30",arr:"20:45"}
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+};
+
+// ============================================================
+// ユーティリティ
+// ============================================================
+const toMin = s => { const[h,m]=s.split(':').map(Number); return h*60+m; };
+const toStr = m => { const h=Math.floor(m/60)%24,mm=m%60; return String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0'); };
+const isWeekday = () => { const d=new Date().getDay(); return d>=1&&d<=5; };
+const nowMin = () => { const n=new Date(); return n.getHours()*60+n.getMinutes(); };
+const fmtTime = s => { const[h,m]=s.split(':'); return String(+h).padStart(2,'0')+':'+String(+m).padStart(2,'0'); };
+
+// ============================================================
+// 永続化
+// ============================================================
+const STORAGE_KEY='commuteConfig_v3', NOTES_KEY='commuteNotes_v3';
+const loadConfig = () => { const s=localStorage.getItem(STORAGE_KEY); if(s){try{return JSON.parse(s);}catch(e){}} return JSON.parse(JSON.stringify(DEFAULT_CONFIG)); };
+const saveConfig = c => localStorage.setItem(STORAGE_KEY, JSON.stringify(c));
+const loadNotes  = () => { const s=localStorage.getItem(NOTES_KEY); if(s){try{return JSON.parse(s);}catch(e){}} return {}; };
+const saveNotes  = n => localStorage.setItem(NOTES_KEY, JSON.stringify(n));
+
+// ============================================================
+// メモキー
+// ============================================================
+const noteKeyExact   = (dir,rk,leg,dep) => `${dir}|${rk}|${leg.lineName}|${leg.fromStation}|${leg.toStation}|${toStr(dep)}`;
+const noteKeyGeneric = (dir,rk,leg)     => `${dir}|${rk}|${leg.lineName}|${leg.fromStation}|${leg.toStation}|*`;
+const getNoteForLeg  = (no,dir,rk,leg,dep) => no[noteKeyExact(dir,rk,leg,dep)] || no[noteKeyGeneric(dir,rk,leg)] || null;
+
+let config=loadConfig(), notes=loadNotes();
+let currentDir='forward', manualRouteKey=null, countdownTimer=null;
+
+// ============================================================
+// 方向切換
+// ============================================================
+function setDir(dir) {
+  currentDir=dir; manualRouteKey=null;
+  document.querySelectorAll('.dir-btn').forEach(b=>b.classList.toggle('active',b.dataset.dir===dir));
+  document.getElementById('results').innerHTML='<div class="hint">「ルートを検索」をタップ</div>';
+}
+function getActiveRouteKey(dir) {
+  if(manualRouteKey)return manualRouteKey;
+  if(dir==='forward')return nowMin()<(config.morningCutoffMinutes||630)?'early':'late';
+  return 'main';
+}
+
+// ============================================================
+// 検索（モードB: dep/arrペア直接マッチ）
+// ============================================================
+function searchRoute(legs, winStart, winEnd) {
+  const wd=isWeekday();
+  const getTrips = leg => (wd?leg.trips.wd:leg.trips.hd)
+    .map(t=>({dep:toMin(t.dep),arr:toMin(t.arr)}))
+    .sort((a,b)=>a.dep-b.dep);
+  const findNext = (trips, earliest) => trips.find(t=>t.dep>=earliest)??null;
+
+  const trips0=getTrips(legs[0]);
+  let candidates=trips0.filter(t=>t.dep>=winStart&&t.dep<=winEnd);
+  let fallback=false;
+  if(!candidates.length){ const nx=findNext(trips0,winStart); if(nx){candidates=[nx];fallback=true;} }
+  if(!candidates.length)return{plans:[],fallback:false};
+
+  const plans=[];
+  for(const t0 of candidates){
+    let valid=true;
+    const planLegs=[{dep:t0.dep,arr:t0.arr,leg:legs[0],transfer:null}];
+    let arrPrev=t0.arr;
+    for(let i=1;i<legs.length;i++){
+      const leg=legs[i];
+      const earliest=arrPrev+(leg.transferMinutes??1);
+      const trips=getTrips(leg);
+      const t=findNext(trips,earliest);
+      if(!t){valid=false;break;}
+      planLegs.push({dep:t.dep,arr:t.arr,leg,transfer:{wait:t.dep-arrPrev,station:legs[i-1].toStation}});
+      arrPrev=t.arr;
+    }
+    if(valid)plans.push({legs:planLegs,depMin:planLegs[0].dep,arrMin:planLegs[planLegs.length-1].arr,total:planLegs[planLegs.length-1].arr-planLegs[0].dep});
+  }
+  return{plans,fallback};
+}
+
+// ============================================================
+// 表示
+// ============================================================
+function doSearch() {
+  config=loadConfig(); notes=loadNotes();
+  const now=nowMin(), winStart=now+(config.searchWindowStart||6), winEnd=now+(config.searchWindowEnd||15);
+  const rk=getActiveRouteKey(currentDir);
+  const routeDef=config.direction[currentDir].routes[rk];
+  const{plans,fallback}=searchRoute(routeDef.legs,winStart,winEnd);
+  let html='';
+
+  if(currentDir==='forward'){
+    const routes=config.direction.forward.routes;
+    const cutoff=config.morningCutoffMinutes||630;
+    html+=`<div class="route-tabs">`;
+    Object.keys(routes).forEach(k=>{ html+=`<div class="route-tab ${k===rk?'active':''}" onclick="switchRoute('${k}')">${routes[k].label}</div>`; });
+    html+=`</div><div class="route-info-box"><strong>自動切換:</strong> ${toStr(cutoff)}前 → 2回乗換 / ${toStr(cutoff)}以降 → 1回乗換</div>`;
+  }
+  if(fallback&&plans.length) html+=`<div style="text-align:center;color:var(--orange);font-size:12px;padding:6px 0 10px;font-weight:600;">⏳ 窓口内に便なし　次の便まであと ${plans[0].depMin-winStart} 分</div>`;
+  if(!plans.length){ html+='<div class="hint">今日はこれ以上便がありません 😴</div>'; document.getElementById('results').innerHTML=html; return; }
+
+  plans.forEach((plan,pi)=>{
+    const isBest=pi===0;
+    html+=`<div class="plan-card${isBest?' best':''}">`;
+    html+=`<div class="plan-top"><div>`;
+    if(isBest)html+=`<div class="best-badge">✦ おすすめ</div>`;
+    html+=`<div class="plan-times">${toStr(plan.depMin)}<span>→</span>${toStr(plan.arrMin)}</div>`;
+    html+=`</div><div class="plan-meta"><div class="total">⏱ ${plan.total}分</div>`;
+    html+=`<div class="countdown" data-dep="${plan.depMin}">あと ${plan.depMin-nowMin()}分</div></div></div>`;
+
+    plan.legs.forEach((pl,li)=>{
+      if(pl.transfer){
+        const w=pl.transfer.wait, cls=w<=1?'tight':w<=2?'moderate':'relaxed', icon=w<=1?'⚡':w<=2?'🚶':'☕';
+        html+=`<div class="transfer-tag ${cls}">${icon} ${pl.transfer.station}で乗換 待ち${w}分</div>`;
+      }
+      html+=`<div class="leg"><div class="leg-dot"></div><div class="leg-info">`;
+      html+=`<div class="leg-line">${pl.leg.lineName}</div>`;
+      html+=`<div class="leg-stations"><span class="time">${toStr(pl.dep)}</span> ${pl.leg.fromStation} → <span class="time">${toStr(pl.arr)}</span> ${pl.leg.toStation}</div>`;
+      const n=getNoteForLeg(notes,currentDir,rk,pl.leg,pl.dep);
+      html+=`<div class="notes-tags">`;
+      if(n){
+        if(n.platform)html+=`<span class="note-tag">📍 ${n.platform}</span>`;
+        if(n.car)     html+=`<span class="note-tag">🚃 ${n.car}</span>`;
+        if(n.door)    html+=`<span class="note-tag">🚪 ${n.door}</span>`;
+        if(n.memo)    html+=`<span class="note-tag">💬 ${n.memo}</span>`;
+        if(notes[noteKeyExact(currentDir,rk,pl.leg,pl.dep)])
+          html+=`<span class="note-time-badge">🕐 ${toStr(pl.dep)}発</span>`;
+        else html+=`<span class="note-time-badge" style="background:#f0fdf4;color:#166534;border-color:#bbf7d0;">📋 全便共通</span>`;
+      }
+      html+=`<span class="note-edit-btn" onclick="openNoteModal('${currentDir}','${rk}',${li},${pl.dep})">✏️ メモ</span>`;
+      html+=`</div></div></div>`;
+    });
+    html+=`</div>`;
+  });
+  document.getElementById('results').innerHTML=html;
+  startCountdown();
+}
+function switchRoute(rk){ manualRouteKey=rk; doSearch(); }
+
+function startCountdown(){
+  if(countdownTimer)clearInterval(countdownTimer);
+  countdownTimer=setInterval(()=>{
+    const now=nowMin();
+    document.querySelectorAll('.countdown').forEach(el=>{
+      const left=parseInt(el.dataset.dep)-now;
+      if(left<=0){el.textContent='出発済み';el.style.color='var(--red)';}
+      else{el.textContent=`あと ${left}分`;el.style.color='';}
+    });
+  },15000);
+}
+
+// ============================================================
+// 乗車メモ Modal
+// ============================================================
+let editNoteKey='', editNoteKeyG='';
+function openNoteModal(dir,rk,li,dep){
+  config=loadConfig(); notes=loadNotes();
+  const leg=config.direction[dir].routes[rk].legs[li];
+  const kE=noteKeyExact(dir,rk,leg,dep), kG=noteKeyGeneric(dir,rk,leg);
+  editNoteKey=kE; editNoteKeyG=kG;
+  const n=notes[kE]||notes[kG]||{};
+  const isGeneric=!notes[kE]&&!!notes[kG];
+  document.getElementById('noteModalLegInfo').textContent=`${leg.lineName}：${leg.fromStation} → ${leg.toStation}`;
+  document.getElementById('noteModalTimeInfo').textContent=`この便の出発 ${toStr(dep)}`;
+  document.getElementById('notePlatform').value=n.platform||'';
+  document.getElementById('noteCar').value=n.car||'';
+  document.getElementById('noteDoor').value=n.door||'';
+  document.getElementById('noteMemo').value=n.memo||'';
+  const mE=!isGeneric;
+  const btn=(id,active)=>`<button onclick="setSaveMode('${id}')" id="modeBtn_${id}"
+    style="flex:1;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+      border:1.5px solid ${active?'var(--accent)':'var(--border)'};
+      background:${active?'var(--accent-light)':'var(--surface2)'};
+      color:${active?'var(--accent)':'var(--text2)'};">${id==='exact'?`🕐 ${toStr(dep)}発専用`:'📋 全便共通'}</button>`;
+  document.getElementById('noteTimeToggleArea').innerHTML=`
+    <div style="display:flex;gap:6px;margin-bottom:8px;">${btn('exact',mE)}${btn('generic',!mE)}</div>
+    <div id="saveModeHint" style="font-size:11px;color:var(--text2);margin-bottom:10px;">
+      ${mE?`✅ ${toStr(dep)}発の便だけに表示`:'✅ この区間の全便に表示'}</div>`;
+  document.getElementById('saveMode').value=mE?'exact':'generic';
+  document.getElementById('noteModal').classList.add('show');
+}
+function setSaveMode(mode){
+  document.getElementById('saveMode').value=mode;
+  const depStr=editNoteKey.split('|').pop();
+  document.getElementById('saveModeHint').textContent=mode==='exact'?`✅ ${depStr}発の便だけに表示`:'✅ この区間の全便に表示';
+  ['exact','generic'].forEach(id=>{
+    const el=document.getElementById(`modeBtn_${id}`); if(!el)return;
+    const a=(id===mode);
+    el.style.borderColor=a?'var(--accent)':'var(--border)';
+    el.style.background =a?'var(--accent-light)':'var(--surface2)';
+    el.style.color      =a?'var(--accent)':'var(--text2)';
+  });
+}
+function closeNoteModal(){ document.getElementById('noteModal').classList.remove('show'); }
+function saveNote(){
+  const mode=document.getElementById('saveMode').value;
+  notes[mode==='generic'?editNoteKeyG:editNoteKey]={
+    platform:document.getElementById('notePlatform').value.trim(),
+    car:     document.getElementById('noteCar').value.trim(),
+    door:    document.getElementById('noteDoor').value.trim(),
+    memo:    document.getElementById('noteMemo').value.trim()
+  };
+  saveNotes(notes); closeNoteModal(); doSearch();
+}
+
+// ============================================================
+// 設定 Modal
+// ============================================================
+function openSettings(){
+  config=loadConfig();
+  const cutoff=config.morningCutoffMinutes||630;
+  const ch=Math.floor(cutoff/60),cm=cutoff%60;
+  let h=`<div class="modal-handle"></div><h2>⚙️ 設定</h2>`;
+  h+=`<h3>🔀 ルート切換時刻</h3>`;
+  h+=`<label>行き：この時刻より前は「早朝ルート」</label>`;
+  h+=`<input type="time" id="setCutoff" value="${String(ch).padStart(2,'0')}:${String(cm).padStart(2,'0')}">`;
+  h+=`<h3>🔍 検索窓口</h3>`;
+  h+=`<label>開始（現在 + X分）</label><input type="number" id="setWinStart" value="${config.searchWindowStart}" min="0" max="60">`;
+  h+=`<label>終了（現在 + X分）</label><input type="number" id="setWinEnd" value="${config.searchWindowEnd}" min="1" max="120">`;
+  h+=`<h3>⏱ 乗換時間</h3>`;
+  h+=`<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">各乗換駅で到着→次の列車に乗るまでの最低必要時間（分）。デフォルト1分。</div>`;
+  ['forward','backward'].forEach(dir=>{
+    const dl=dir==='forward'?'🏢 行き':'🏠 帰り';
+    Object.keys(config.direction[dir].routes).forEach(rk=>{
+      const route=config.direction[dir].routes[rk];
+      route.legs.forEach((leg,li)=>{
+        if(li===0)return;
+        h+=`<div class="transfer-row">
+          <div class="tr-label">${leg.fromStation}での乗換<small>${dl} / ${route.label}</small></div>
+          <input type="number" class="tr-inp" min="0" max="30"
+            data-dir="${dir}" data-route="${rk}" data-idx="${li}"
+            value="${leg.transferMinutes??1}">
+          <span class="tr-unit">分</span>
+        </div>`;
+      });
+    });
+  });
+  h+=`<div class="modal-actions"><button class="btn-secondary" onclick="closeSettings()">キャンセル</button><button class="btn-primary" onclick="saveSettings()">保存</button></div>`;
+  document.getElementById('settingsContent').innerHTML=h;
+  document.getElementById('settingsModal').classList.add('show');
+}
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('show'); }
+function saveSettings(){
+  const ct=document.getElementById('setCutoff').value;
+  if(ct){const[ch,cm]=ct.split(':').map(Number);config.morningCutoffMinutes=ch*60+cm;}
+  config.searchWindowStart=parseInt(document.getElementById('setWinStart').value)||6;
+  config.searchWindowEnd  =parseInt(document.getElementById('setWinEnd').value)||15;
+  document.querySelectorAll('.tr-inp').forEach(inp=>{
+    config.direction[inp.dataset.dir].routes[inp.dataset.route].legs[parseInt(inp.dataset.idx)].transferMinutes=parseInt(inp.value)||1;
+  });
+  saveConfig(config); closeSettings();
+}
+
+// ============================================================
+// 時刻表編集 Modal（CSV対応）
+// ============================================================
+function parseCSV(text){
+  // 各行: "07:30,07:45" / "07:30-07:45" / "07:30 07:45"
+  return text.split('\n').reduce((acc,line)=>{
+    line=line.trim(); if(!line)return acc;
+    const parts=line.split(/[,\-\s]+/).map(s=>s.trim()).filter(Boolean);
+    if(parts.length>=2){
+      const[dep,arr]=[parts[0],parts[1]];
+      if(/^\d{1,2}:\d{2}$/.test(dep)&&/^\d{1,2}:\d{2}$/.test(arr))
+        acc.push({dep:fmtTime(dep),arr:fmtTime(arr)});
+    }
+    return acc;
+  },[]);
+}
+
+function openTTEditor(){
+  config=loadConfig();
+  let h=`<div class="modal-handle"></div><h2>🕐 時刻表編集</h2>`;
+  h+=`<div style="font-size:11px;color:var(--text2);margin-bottom:12px;background:var(--accent-light);padding:8px 10px;border-radius:8px;">
+    CSV形式：1行に「<strong>出発時刻,到着時刻</strong>」（カンマ・ハイフン・スペース区切り可）<br>例：07:30,07:45 ／ 07:30-07:45 ／ 07:30 07:45
+  </div>`;
+  ['forward','backward'].forEach(dir=>{
+    const dl=dir==='forward'?'🏢 行き':'🏠 帰り';
+    h+=`<h3>${dl}</h3>`;
+    Object.keys(config.direction[dir].routes).forEach(rk=>{
+      const route=config.direction[dir].routes[rk];
+      h+=`<div style="font-size:12px;color:var(--accent2);font-weight:700;margin:10px 0 6px;">▸ ${route.label}</div>`;
+      route.legs.forEach((leg,li)=>{
+        h+=`<div class="leg-tt-box"><h4>${leg.lineName}：${leg.fromStation} → ${leg.toStation}</h4>`;
+        ['wd','hd'].forEach(dt=>{
+          const label=dt==='wd'?'平日':'土休日';
+          const trips=leg.trips[dt]||[];
+          const tid=`${dir}_${rk}_${li}_${dt}`;
+          h+=`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">`;
+          h+=`<div style="font-size:11px;color:var(--text2);font-weight:700;margin-bottom:5px;">${label}（${trips.length}件）</div>`;
+          h+=`<div class="tt-pair-list" id="pairs_${tid}">`;
+          trips.forEach((t,ti)=>{
+            h+=`<div class="tt-pair-row"><span class="times">${t.dep} → ${t.arr}</span><span class="del-pair" onclick="removePair('${dir}','${rk}',${li},'${dt}',${ti})">×</span></div>`;
+          });
+          h+=`</div>`;
+          h+=`<div class="tt-add-row">
+            <input type="time" id="addDep_${tid}">
+            <span>→</span>
+            <input type="time" id="addArr_${tid}">
+            <button class="add-btn" onclick="addPair('${dir}','${rk}',${li},'${dt}')">＋追加</button>
+          </div>`;
+          h+=`<div class="csv-area">
+            <span class="csv-label">CSV一括入力</span>
+            <div class="csv-help">複数行まとめて貼り付け可。既存データへの追加または置換が選べます。</div>
+            <textarea id="csv_${tid}" placeholder="07:30,07:45&#10;07:38,07:53&#10;07:45,08:00"></textarea>
+            <div class="csv-btns">
+              <button class="csv-btn add"     onclick="importCSV('${dir}','${rk}',${li},'${dt}',false)">📥 追加インポート</button>
+              <button class="csv-btn replace" onclick="importCSV('${dir}','${rk}',${li},'${dt}',true)">🔄 置換インポート</button>
+            </div>
+          </div>`;
+          h+=`</div>`;
+        });
+        h+=`</div>`;
+      });
+    });
+  });
+  h+=`<div class="modal-actions"><button class="btn-primary" onclick="closeTTEditor()">完了</button></div>`;
+  document.getElementById('ttContent').innerHTML=h;
+  document.getElementById('ttModal').classList.add('show');
+}
+function closeTTEditor(){ document.getElementById('ttModal').classList.remove('show'); }
+
+function addPair(dir,rk,li,dt){
+  const tid=`${dir}_${rk}_${li}_${dt}`;
+  const dep=document.getElementById(`addDep_${tid}`).value;
+  const arr=document.getElementById(`addArr_${tid}`).value;
+  if(!dep||!arr)return;
+  config.direction[dir].routes[rk].legs[li].trips[dt].push({dep:fmtTime(dep.slice(0,5)),arr:fmtTime(arr.slice(0,5))});
+  config.direction[dir].routes[rk].legs[li].trips[dt].sort((a,b)=>a.dep.localeCompare(b.dep));
+  saveConfig(config); openTTEditor();
+}
+function removePair(dir,rk,li,dt,ti){
+  config.direction[dir].routes[rk].legs[li].trips[dt].splice(ti,1);
+  saveConfig(config); openTTEditor();
+}
+function importCSV(dir,rk,li,dt,replace){
+  const tid=`${dir}_${rk}_${li}_${dt}`;
+  const pairs=parseCSV(document.getElementById(`csv_${tid}`).value);
+  if(!pairs.length){alert('有効な時刻ペアが見つかりませんでした。\n形式例: 07:30,07:45');return;}
+  if(replace){
+    config.direction[dir].routes[rk].legs[li].trips[dt]=pairs;
+  } else {
+    config.direction[dir].routes[rk].legs[li].trips[dt].push(...pairs);
+    // 重複除去
+    const seen=new Set();
+    config.direction[dir].routes[rk].legs[li].trips[dt]=
+      config.direction[dir].routes[rk].legs[li].trips[dt].filter(t=>{const k=t.dep+'|'+t.arr;if(seen.has(k))return false;seen.add(k);return true;});
+  }
+  config.direction[dir].routes[rk].legs[li].trips[dt].sort((a,b)=>a.dep.localeCompare(b.dep));
+  saveConfig(config); openTTEditor();
+}
+
+// ============================================================
+// メモ管理 Modal
+// ============================================================
+function openNotesList(){
+  notes=loadNotes();
+  let h=`<div class="modal-handle"></div><h2>📝 メモ管理</h2>`;
+  const keys=Object.keys(notes);
+  if(!keys.length){ h+=`<div style="color:var(--text2);padding:30px 0;text-align:center;font-size:14px;">まだメモはありません</div>`; }
+  else {
+    keys.forEach(k=>{
+      const n=notes[k], parts=k.split('|');
+      const tl=parts[5]==='*'?'全便共通':`${parts[5]}発専用`;
+      h+=`<div class="note-list-item">
+        <span class="del-note" onclick="deleteNote('${k}')">🗑</span>
+        <div class="nkey">${parts[2]}：${parts[3]} → ${parts[4]}</div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">🕐 ${tl}</div>`;
+      const vals=[];
+      if(n.platform)vals.push('📍 '+n.platform);
+      if(n.car)     vals.push('🚃 '+n.car);
+      if(n.door)    vals.push('🚪 '+n.door);
+      if(n.memo)    vals.push('💬 '+n.memo);
+      h+=`<div class="nvals">${vals.join(' | ')||'（内容なし）'}</div></div>`;
+    });
+  }
+  h+=`<div class="modal-actions"><button class="btn-primary" onclick="closeNotesList()">閉じる</button></div>`;
+  document.getElementById('notesListContent').innerHTML=h;
+  document.getElementById('notesListModal').classList.add('show');
+}
+function closeNotesList(){ document.getElementById('notesListModal').classList.remove('show'); }
+function deleteNote(k){ delete notes[k]; saveNotes(notes); openNotesList(); }
+
+// ============================================================
+// 初期化
+// ============================================================
+document.body.insertAdjacentHTML('beforeend','<input type="hidden" id="saveMode" value="exact">');
+
+function updateClock(){
+  const n=new Date(), day=['日','月','火','水','木','金','土'][n.getDay()];
+  document.getElementById('clock').textContent=
+    `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')} ${day} ${isWeekday()?'平日':'土休日'}`;
+}
+setInterval(updateClock,10000); updateClock();
+document.getElementById('routeName').textContent='🚃 '+config.routeName;
+
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('show');});
+});
+
+if('serviceWorker' in navigator){
+  const sw=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
+  navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'application/javascript'}))).catch(()=>{});
+}
+</script>
+</body>
+</html>
