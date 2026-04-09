@@ -699,7 +699,7 @@ function saveSettings(){
   config.searchWindowStart=parseInt(document.getElementById('setWinStart').value)||6;
   config.searchWindowEnd  =parseInt(document.getElementById('setWinEnd').value)||15;
   document.querySelectorAll('.tr-inp').forEach(inp=>{
-    config.direction[inp.dataset.dir].routes[inp.dataset.route].legs[parseInt(inp.dataset.idx)].transferMinutes=isNaN(v)?1:Math.max(0,v);
+    const v=parseInt(inp.value); config.direction[inp.dataset.dir].routes[inp.dataset.route].legs[parseInt(inp.dataset.idx)].transferMinutes=isNaN(v)?1:Math.max(0,v);
   });
   saveConfig(config); closeSettings();
 }
