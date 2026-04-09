@@ -519,7 +519,7 @@ function searchRoute(legs, winStart, winEnd) {
     let arrPrev=t0.arr;
     for(let i=1;i<legs.length;i++){
       const leg=legs[i];
-      const earliest=arrPrev+(leg.transferMinutes??1);
+      const earliest=arrPrev+(leg.transferMinutes!=null?leg.transferMinutes:1);
       const trips=getTrips(leg);
       const t=findNext(trips,earliest);
       if(!t){valid=false;break;}
@@ -699,7 +699,7 @@ function saveSettings(){
   config.searchWindowStart=parseInt(document.getElementById('setWinStart').value)||6;
   config.searchWindowEnd  =parseInt(document.getElementById('setWinEnd').value)||15;
   document.querySelectorAll('.tr-inp').forEach(inp=>{
-    config.direction[inp.dataset.dir].routes[inp.dataset.route].legs[parseInt(inp.dataset.idx)].transferMinutes=parseInt(inp.value)||1;
+    config.direction[inp.dataset.dir].routes[inp.dataset.route].legs[parseInt(inp.dataset.idx)].transferMinutes=isNaN(v)?1:Math.max(0,v);
   });
   saveConfig(config); closeSettings();
 }
